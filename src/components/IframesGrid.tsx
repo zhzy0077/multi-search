@@ -1,4 +1,4 @@
-import { For } from 'solid-js';
+import { For, createEffect, createSignal, onCleanup, onMount } from 'solid-js';
 import type { Engine } from '../types';
 
 export type IframesGridProps = {
@@ -18,8 +18,51 @@ const buildUrl = (tpl: string, q: string) => {
 };
 
 export function IframesGrid(props: IframesGridProps) {
+    let gridEl: HTMLDivElement | undefined;
+    const [tileHeight, setTileHeight] = createSignal(props.minHeight);
+
+    const recalc = () => {
+        if (!gridEl) {
+            setTileHeight(props.minHeight);
+            return;
+        }
+        const tiles = Array.from(gridEl.querySelectorAll<HTMLDivElement>('[data-tile="1"]'));
+        if (!tiles.length) {
+            setTileHeight(props.minHeight);
+            return;
+        }
+        const tops = new Set(tiles.map(t => t.offsetTop));
+        const singleRow = tops.size === 1;
+
+        if (!singleRow) {
+            setTileHeight(props.minHeight);
+            return;
+        }
+
+        const gridRect = gridEl.getBoundingClientRect();
+        const available = Math.max(0, window.innerHeight - gridRect.top - 12);
+        const headerEl = tiles[0].querySelector<HTMLElement>('[data-header="1"]');
+        const headerH = headerEl?.offsetHeight ?? 32;
+        const computed = Math.max(props.minHeight, Math.floor(available - headerH - 8));
+        setTileHeight(computed);
+    };
+
+    onMount(() => {
+        recalc();
+        const onResize = () => recalc();
+        window.addEventListener('resize', onResize);
+        onCleanup(() => window.removeEventListener('resize', onResize));
+    });
+
+    createEffect(() => {
+        // react when engines count or minHeight changes
+        void props.engines.length;
+        void props.minHeight;
+        requestAnimationFrame(recalc);
+    });
+
     return (
-        <div class="p-3 flex flex-wrap gap-3">
+        <div ref={gridEl} class="px-3 pt-3 flex flex-wrap gap-3">
             <For each={props.engines}>
                 {(engine) => (
                     <div
@@ -28,8 +71,9 @@ export function IframesGrid(props: IframesGridProps) {
                             flex: `1 1 ${props.minWidth}px`,
                             'min-width': `${props.minWidth}px`,
                         }}
+                        data-tile="1"
                     >
-                        <div class="flex items-center justify-between px-2 py-1 border-b bg-gray-50">
+                        <div class="flex items-center justify-between px-2 py-1 border-b bg-gray-50" data-header="1">
                             <a
                                 href={buildUrl(engine.urlTemplate, props.query)}
                                 target="_blank"
@@ -52,7 +96,7 @@ export function IframesGrid(props: IframesGridProps) {
                             title={engine.name}
                             src={buildUrl(engine.urlTemplate, props.query)}
                             class="w-full bg-white"
-                            style={{ height: `${props.minHeight}px` }}
+                            style={{ height: `${tileHeight()}px` }}
                         />
                     </div>
                 )}

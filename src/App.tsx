@@ -26,6 +26,8 @@ const App: Component = () => {
   const [profiles, setProfiles] = createSignal<Profile[]>(initialProfiles);
   const [selectedProfileId, setSelectedProfileId] = createSignal<string>(initialProfiles[0].id);
   const [showSettings, setShowSettings] = createSignal(false);
+  // Track engines hidden for current submitted query per profile
+  const [hiddenEngines, setHiddenEngines] = createSignal<Record<string, Set<string>>>({});
   const [showAbout, setShowAbout] = createSignal(false);
 
   const PROFILES_KEY = 'multi-search.profiles';
@@ -70,11 +72,30 @@ const App: Component = () => {
 
   const onSubmit = (e: Event) => {
     e.preventDefault();
-    setSubmitted(query().trim());
+    const q = query().trim();
+    setSubmitted(q);
+    // Reset hidden engines for this profile when a new search is performed
+    setHiddenEngines((prev) => ({ ...prev, [selectedProfileId()]: new Set<string>() }));
   };
 
   const removeEngineFrom = (profileId: string, id: string) => {
+    // Retained for settings modal delete (permanent)
     setProfiles((prev) => prev.map((p) => (p.id === profileId ? { ...p, engines: p.engines.filter((e) => e.id !== id) } : p)));
+  };
+
+  const hideEngineForCurrentSearch = (id: string) => {
+    const pid = selectedProfileId();
+    setHiddenEngines((prev) => {
+      const existing = prev[pid] ? new Set(prev[pid]) : new Set<string>();
+      existing.add(id);
+      return { ...prev, [pid]: existing };
+    });
+  };
+  const visibleEngines = () => {
+    const profile = selectedProfile();
+    const hidden = hiddenEngines()[selectedProfileId()];
+    if (!hidden) return profile.engines;
+    return profile.engines.filter(e => !hidden.has(e.id));
   };
 
   const updateEngineIn = (profileId: string, id: string, patch: Partial<Engine>) => {
@@ -157,7 +178,7 @@ const App: Component = () => {
                 name="profile"
                 value={p.id}
                 checked={selectedProfileId() === p.id}
-                onChange={() => setSelectedProfileId(p.id)}
+                onChange={() => { setSelectedProfileId(p.id); setHiddenEngines((prev) => ({ ...prev, [p.id]: new Set<string>() })); }}
                 class="sr-only"
               />
               {p.name}
@@ -196,9 +217,9 @@ const App: Component = () => {
       </form>
 
       <IframesGrid
-        engines={selectedProfile().engines}
+        engines={visibleEngines()}
         query={submitted()}
-        onRemove={(id) => removeEngineFrom(selectedProfileId(), id)}
+        onHide={(id) => hideEngineForCurrentSearch(id)}
         minWidth={Math.max(100, selectedProfile().minWidth ?? 500)}
         minHeight={Math.max(100, selectedProfile().minHeight ?? 500)}
       />

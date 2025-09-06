@@ -20,7 +20,7 @@ export function AboutModal(props: AboutModalProps) {
                     <ul class="list-disc pl-5 text-sm space-y-1">
                         <li>
                             <a
-                                href="https://chromewebstore.google.com/detail/ignore-x-frame-headers/ohgdnhkppgeemnmjebhedjneajcedppf"
+                                href="https://chromewebstore.google.com/detail/jfjdfokifdlmbkbncmcfbcobggohdnif"
                                 target="_blank"
                                 rel="noreferrer noopener"
                                 class="text-blue-600 hover:underline"

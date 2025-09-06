@@ -4,7 +4,7 @@ import type { Engine } from '../types';
 export type IframesGridProps = {
     engines: Engine[];
     query: string; // submitted query
-    onRemove: (id: string) => void;
+    onHide: (id: string) => void; // hide for current search session only
     minWidth: number;
     minHeight: number;
 };
@@ -86,10 +86,10 @@ export function IframesGrid(props: IframesGridProps) {
                             <button
                                 type="button"
                                 class="text-xs text-red-600 hover:underline"
-                                onClick={() => props.onRemove(engine.id)}
-                                aria-label={`Remove ${engine.name}`}
+                                onClick={() => props.onHide(engine.id)}
+                                aria-label={`Hide ${engine.name} for this search`}
                             >
-                                Remove
+                                Hide
                             </button>
                         </div>
                         <iframe

@@ -1,4 +1,4 @@
-import { For, createSignal, Show } from 'solid-js';
+import { For, createSignal, Show, createEffect } from 'solid-js';
 import type { Engine, Profile } from '../types';
 
 export type SettingsModalProps = {
@@ -17,6 +17,18 @@ export type SettingsModalProps = {
 export function SettingsModal(props: SettingsModalProps) {
     const firstId = () => props.initialActiveProfileId || props.profiles[0]?.id || '';
     const [activeId, setActiveId] = createSignal(firstId());
+    // Draft sizing so user can type numbers like 400 without early clamping back to 100
+    const [draftMinWidth, setDraftMinWidth] = createSignal('');
+    const [draftMinHeight, setDraftMinHeight] = createSignal('');
+
+    // Sync drafts when active profile changes or profiles list updates
+    createEffect(() => {
+        const ap = props.profiles.find((p) => p.id === activeId());
+        if (ap) {
+            setDraftMinWidth(String(ap.minWidth ?? 500));
+            setDraftMinHeight(String(ap.minHeight ?? 500));
+        }
+    });
 
     const activeProfile = () => props.profiles.find((p) => p.id === activeId()) || props.profiles[0];
 
@@ -81,7 +93,8 @@ export function SettingsModal(props: SettingsModalProps) {
                             <input
                                 class="flex-1 px-2 py-1 border rounded"
                                 value={activeProfile()!.name}
-                                onInput={(e) => props.onRename(activeId(), e.currentTarget.value)}
+                                // Use onChange so typing doesn't continuously update all dependent components
+                                onChange={(e) => props.onRename(activeId(), e.currentTarget.value)}
                             />
                         </div>
                         <div class="flex items-center gap-4">
@@ -91,12 +104,14 @@ export function SettingsModal(props: SettingsModalProps) {
                                     type="number"
                                     min="100"
                                     class="w-24 px-2 py-1 border rounded"
-                                    value={activeProfile()!.minWidth ?? 500}
-                                    onInput={(e) =>
-                                        props.onUpdateProfile(activeId(), {
-                                            minWidth: Math.max(100, parseInt(e.currentTarget.value || '0', 10) || 0),
-                                        })
-                                    }
+                                    value={draftMinWidth()}
+                                    onInput={(e) => setDraftMinWidth(e.currentTarget.value)}
+                                    onBlur={() => {
+                                        const raw = parseInt(draftMinWidth() || '0', 10);
+                                        const clamped = isFinite(raw) ? Math.max(100, raw) : 100;
+                                        props.onUpdateProfile(activeId(), { minWidth: clamped });
+                                        setDraftMinWidth(String(clamped));
+                                    }}
                                 />
                             </label>
                             <label class="flex items-center gap-2 text-sm">
@@ -105,12 +120,14 @@ export function SettingsModal(props: SettingsModalProps) {
                                     type="number"
                                     min="100"
                                     class="w-24 px-2 py-1 border rounded"
-                                    value={activeProfile()!.minHeight ?? 500}
-                                    onInput={(e) =>
-                                        props.onUpdateProfile(activeId(), {
-                                            minHeight: Math.max(100, parseInt(e.currentTarget.value || '0', 10) || 0),
-                                        })
-                                    }
+                                    value={draftMinHeight()}
+                                    onInput={(e) => setDraftMinHeight(e.currentTarget.value)}
+                                    onBlur={() => {
+                                        const raw = parseInt(draftMinHeight() || '0', 10);
+                                        const clamped = isFinite(raw) ? Math.max(100, raw) : 100;
+                                        props.onUpdateProfile(activeId(), { minHeight: clamped });
+                                        setDraftMinHeight(String(clamped));
+                                    }}
                                 />
                             </label>
                         </div>
@@ -122,7 +139,8 @@ export function SettingsModal(props: SettingsModalProps) {
                                         <input
                                             class="flex-1 px-2 py-1 border rounded"
                                             value={engine.name}
-                                            onInput={(e) => props.onUpdate(activeId(), engine.id, { name: e.currentTarget.value })}
+                                            // Defer updates until change commit to prevent iframe grid re-renders on each keystroke
+                                            onChange={(e) => props.onUpdate(activeId(), engine.id, { name: e.currentTarget.value })}
                                         />
                                     </div>
                                     <div class="flex items-center gap-2">
@@ -131,7 +149,9 @@ export function SettingsModal(props: SettingsModalProps) {
                                             class="flex-1 px-2 py-1 border rounded"
                                             value={engine.urlTemplate}
                                             placeholder="Use {q} for the query"
-                                            onInput={(e) => props.onUpdate(activeId(), engine.id, { urlTemplate: e.currentTarget.value })}
+                                            // Use onChange instead of onInput so we don't re-render & reload iframes on every keystroke
+                                            // (which caused the window/iframes to constantly reload and the input to lose focus).
+                                            onChange={(e) => props.onUpdate(activeId(), engine.id, { urlTemplate: e.currentTarget.value })}
                                         />
                                     </div>
                                     <div class="flex justify-end">
